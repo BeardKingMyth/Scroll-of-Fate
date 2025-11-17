@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Scroll of Fates</title>
+  <link href="https://fonts.googleapis.com/css2?family=UnifrakturCook:wght@700&display=swap" rel="stylesheet" />
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background-image: url('https://www.transparenttextures.com/patterns/paper-fibers.png');
+      background-color: #f3e5ab;
+      font-family: 'UnifrakturCook', cursive;
+      color: #4b2e0e;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      min-height: 100vh;
+      padding-top: 40px;
+      background-size: cover;
+      text-align: center;
+    }
+
+    h1 {
+      font-size: 48px;
+      text-shadow: 2px 2px #d4c07a;
+    }
+
+    select, button {
+      font-family: 'UnifrakturCook', cursive;
+      font-size: 18px;
+      padding: 10px;
+      margin: 10px;
+      border: 2px solid #a0522d;
+      border-radius: 8px;
+    }
+
+    .roll-btn, .clear-btn, .add-btn {
+      background-color: #c7a94b;
+      color: white;
+      border: 3px solid #4b2e0e;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+
+    .roll-btn:hover, .clear-btn:hover, .add-btn:hover {
+      background-color: #e8c867;
+    }
+
+    .scroll-container {
+      overflow: hidden;
+      width: 80%;
+      max-width: 750px;
+      border: 10px solid #a0522d;
+      border-radius: 15px;
+      box-shadow: 0 0 25px rgba(0, 0, 0, 0.5);
+      background: #fff8dc;
+      padding: 0;
+      transform: scaleY(0);
+      transform-origin: top;
+      transition: transform 1s ease-out;
+      margin-top: 20px;
+    }
+
+    .scroll-container.open {
+      transform: scaleY(1);
+    }
+
+    .scroll-content {
+      padding: 30px;
+    }
+
+    .result {
+      font-size: 28px;
+      margin-top: 20px;
+      line-height: 1.6;
+      opacity: 0;
+      transition: opacity 1s ease-in;
+    }
+
+    .result.visible {
+      opacity: 1;
+    }
+
+    .quote {
+      font-style: italic;
+      font-size: 20px;
+      margin-top: 15px;
+      color: #7b5e2b;
+    }
+
+    .history-container, .pool-container {
+      margin-top: 20px;
+      background: #f5ecd6;
+      border: 5px solid #a0522d;
+      padding: 20px;
+      border-radius: 12px;
+      width: 80%;
+      max-width: 700px;
+      box-shadow: 0 0 15px rgba(0, 0, 0, 0.3);
+      text-align: left;
+    }
+
+    .history-title, .pool-title {
+      font-size: 24px;
+      margin-bottom: 10px;
+      text-decoration: underline;
+    }
+
+    .history-list, .pool-list {
+      list-style-type: decimal;
+      padding-left: 20px;
+      font-size: 18px;
+      margin: 0;
+    }
+  </style>
+</head>
+<body>
+  <h1>Scroll of Fates</h1>
+
+  <div>
+    <select id="universeSelect" onchange="updateCharacterList()">
+      <option value="">Choose a universe...</option>
+    </select>
+
+    <select id="characterSelect">
+      <option value="">Choose a character...</option>
+    </select>
+  </div>
+
+  <div style="margin-top: 20px;">
+    <h2>Add or Update a Universe</h2>
+    <input id="newUniverse" type="text" placeholder="Universe name" />
+    <input id="newCharacters" type="text" placeholder="Characters (comma separated)" />
+    <button class="add-btn" onclick="addOrUpdateUniverse()">Add / Update Universe</button>
+  </div>
+
+
+  <button class="add-btn" onclick="addToPool()">Add to Destiny Pool</button>
+  <button class="add-btn" onclick="rollRandomFate()">Let Fate Choose For Me</button>
+  <button class="clear-btn" onclick="clearDestinyPool()">Clear Pool</button>
+  <button class="roll-btn" onclick="unfurlScroll()">Unfurl Your Destiny</button>
+  <button class="clear-btn" onclick="clearHistory()">Clear History</button>
+
+
+  <div class="pool-container" id="poolBox">
+    <div class="pool-title">Your Destiny Pool</div>
+    <ol class="pool-list" id="poolList"></ol>
+  </div>
+
+  <div class="scroll-container" id="scroll">
+    <div class="scroll-content">
+      <div class="result" id="result"></div>
+      <div class="quote" id="quote"></div>
+    </div>
+  </div>
+
+  <div class="history-container" id="historyBox">
+    <div class="history-title">Fate History</div>
+    <ol class="history-list" id="historyList"></ol>
+  </div>
+
+  <audio id="scrollSound" src="https://cdn.pixabay.com/audio/2022/03/15/audio_a42a7aa92e.mp3" preload="auto"></audio>
+
+  <script>
+    const LOCAL_UNIVERSES_KEY = "scrollOfFatesCustomUniverses";
+    let characterData = {
+      "The Vampire Diaries": ["Klaus Mikaelson", "Elijah Mikaelson", "Stefan Salvatore", "Damon Salvatore", "Caroline Forbes", "Bonnie Bennett", "Alaric Saltzman", "Kai Parker", "Rebekah Mikaelson", "Finn Mikaelson", "Kol Mikaelson", "Freya Mikaelson", "Elena Gilbert", "Enzo St John", "Valerie Tulle", "Josh", "Marcel Gerard", "Mikael", "Esther", "Dahlia", "Inadu", "Tristan de Martel", "Aurora de Martel", "Lucien Castel", "Anna Zhu", "Pearl Zhu", "Jeremy Gilbert", "Katerina Petrova", "Silas", "Amara", "Quetsiyah", "Hayley Marshal", "Tyler Lockwood"],
+      "The Inheritance Cycle": [ "Eragon", "Murtagh", "Arya", "Roran", "Oromis", "Glaedr", "Galbatorix", "Angela", "Saphira", "Thorn", "Brom", "Solembum", "Orik", "Blodhgarm", "Vanir", "Islanzadi", "Hrothgar", "Ajihad", "Jormundur", "Jeod"],
+      "Harry Potter": [ "Harry Potter", "Hermione Granger", "Ron Weasley", "Draco Malfoy", "Severus Snape", "Albus Dumbledore", "Luna Lovegood", "Lord Voldemort", "Neville Longbottom", "Fred Weasley", "George Weasley", "Cedric Diggory"],
+      "Heroes": ["Peter Petrelli", "Sylar", "Hiro Nakamura", "Claire Bennet", "Mohinder Suresh", "Noah Bennet", "Angela Petrelli", "Matt Parkman"],
+      "True Blood": ["Eric Northman", "Sookie Stackhouse", "Bill Compton", "Pam Swynford De Beaufort", "Jessica Hamby", "Lafayette Reynolds", "Tara Thornton", "Sam Merlotte"],
+      "Merlin": ["Merlin", "Arthur Pendragon", "Morgana", "Gaius", "Mordred", "Uther Pendragon", "Guinevere", "Kilgharrah"],
+      "Arrowverse": ["Barry Allen", "Oliver Queen", "Kara Danvers", "Sara Lance", "John Constantine", "Wally West", "Eobard Thawne", "Cisco Ramon", "Harrison Wells", "John Diggle", "Caitlin Snow", "Frost", "Ray Palmer", "Joe West", "Leonard Snart", "Mick Rory", "Clark Kent", "Malcom Merlin", "Thea Queen", "Laurel Lance"],
+      "The Witcher": ["Geralt of Rivia", "Yennefer", "Ciri", "Triss Merigold", "Dandelion", "Vesemir", "Emhyr var Emreis", "Tissaia de Vries"],
+      "Game of Thrones": ["Jon Snow", "Daenerys Targaryen", "Tyrion Lannister", "Arya Stark", "Cersei Lannister", "Jaime Lannister", "Brienne of Tarth", "The Night King", "Ned Stark", "Robb Stark", "Bran Stark", "Sansa Stark", "Rickon Stark", "Brandon Stark", "Benjen Stark", "Lyanna Stark", "Raehgar Targaryen", "Aerys Targaryen", "Viserys Targaryen", "Young Gryff", "Aemon Targaryen", "Jon Connington", "Arthur Dayne", "Gerold Hightower", "Oswell Whent", "Varys", "Littlefinger", "Robert Baratheon", "Stannis Baratheon", "Renly Baratheon", "Joffrey Baratheon", "Tommen Baratheon", "Myrcella Baratheon", "Tywin Lannister", "Jon Arryn", "Oberyn Martell"],
+      "Naruto": ["Naruto Uzumaki", "Sasuke Uchiha", "Sakura Haruno", "Kakashi Hatake", "Itachi Uchiha", "Hinata Hyuga", "Shikamaru Nara", "Jiraiya", "Ino Yamanaka", "Tenten", "Rock Lee", "Nejii Hyuga", "Hashirama Senju", "Tobirama Senju", "Tsunade Senju", "Hiruzen Sarutobi", "Asuma Sarutobi", "Konohamaru Sarutobi", "Minato Namikaze", "Kushina Uzumaki", "Madara Uchiha"]
+    };
+
+    const fateQuotes = [
+      "The stars whispered your name long before you were born.",
+      "Destiny does not ask; it declares.",
+      "The threads of fate have been spun — there is no turning back.",
+      "A soul reborn where legends rise.",
+      "Your story has been written in fire and blood.",
+      "The past is dust; the future, myth — you are the bridge.",
+      "The die was cast long before you took your first breath.",
+      "Not all are chosen — but you were carved from destiny itself.",
+      "Time folds around you like parchment — and you are the ink.",
+      "From the ashes of one life, the ember of another rises.",
+      "You are not lost — merely called elsewhere by the will of fate."
+    ];
+
+    let destinyPool = [];
+    let history = JSON.parse(localStorage.getItem("scrollOfFatesHistory")) || [];
+
+    function populateUniverses() {
+      const universeSelect = document.getElementById("universeSelect");
+      Object.keys(characterData).forEach(universe => {
+        const option = document.createElement("option");
+        option.value = universe;
+        option.textContent = universe;
+        universeSelect.appendChild(option);
+      });
+    }
+
+    function updateCharacterList() {
+      const universe = document.getElementById("universeSelect").value;
+      const characterSelect = document.getElementById("characterSelect");
+      characterSelect.innerHTML = '<option value="">Choose a character...</option>';
+
+      if (characterData[universe]) {
+        characterData[universe].forEach(character => {
+          const option = document.createElement("option");
+          option.value = character;
+          option.textContent = character;
+          characterSelect.appendChild(option);
+        });
+      }
+    }
+
+    function addToPool() {
+      const universe = document.getElementById("universeSelect").value;
+      const character = document.getElementById("characterSelect").value;
+      if (!universe || !character) {
+        alert("Please select both a universe and a character first.");
+        return;
+      }
+      const fate = `${universe} as ${character}`;
+      if (!destinyPool.includes(fate)) {
+        destinyPool.push(fate);
+        updatePoolList();
+      }
+    }
+
+    function updatePoolList() {
+      const list = document.getElementById("poolList");
+      list.innerHTML = "";
+      destinyPool.forEach(entry => {
+        const li = document.createElement("li");
+        li.textContent = entry;
+        list.appendChild(li);
+      });
+    }
+
+    function unfurlScroll() {
+      if (destinyPool.length === 0) {
+        alert("Your Destiny Pool is empty. Add some fates first.");
+        return;
+      }
+
+      const scroll = document.getElementById("scroll");
+      const result = document.getElementById("result");
+      const quote = document.getElementById("quote");
+      const sound = document.getElementById("scrollSound");
+
+      const fate = destinyPool[Math.floor(Math.random() * destinyPool.length)];
+      const fateQuote = fateQuotes[Math.floor(Math.random() * fateQuotes.length)];
+
+      history.push(fate);
+      if (history.length > 10) history.shift();
+      localStorage.setItem("scrollOfFatesHistory", JSON.stringify(history));
+      updateHistoryList();
+
+      sound.currentTime = 0;
+      sound.play();
+
+      if (!scroll.classList.contains("open")) {
+        result.textContent = "You were reincarnated into: " + fate;
+        quote.textContent = fateQuote;
+        result.classList.remove("visible");
+        quote.classList.remove("visible");
+
+        scroll.classList.add("open");
+
+        setTimeout(() => {
+          result.classList.add("visible");
+          quote.classList.add("visible");
+        }, 1000);
+      } else {
+        scroll.classList.remove("open");
+        result.classList.remove("visible");
+        quote.classList.remove("visible");
+
+        setTimeout(() => {
+          result.textContent = "You were reincarnated into: " + fate;
+          quote.textContent = fateQuote;
+          scroll.classList.add("open");
+
+          setTimeout(() => {
+            result.classList.add("visible");
+            quote.classList.add("visible");
+          }, 1000);
+        }, 600);
+      }
+    }
+    function loadCustomUniverses() {
+  const saved = localStorage.getItem(LOCAL_UNIVERSES_KEY);
+  if (!saved) return;
+
+  try {
+    const customData = JSON.parse(saved);
+    for (const [universe, chars] of Object.entries(customData)) {
+      if (!characterData[universe]) {
+        characterData[universe] = chars;
+        addUniverseOption(universe);
+      } else {
+        chars.forEach(char => {
+          if (!characterData[universe].includes(char)) {
+            characterData[universe].push(char);
+          }
+        });
+      }
+    }
+  } catch (e) {
+    console.error("Failed to load custom universes:", e);
+  }
+}
+    function addUniverseOption(universe) {
+  const universeSelect = document.getElementById("universeSelect");
+  const existing = Array.from(universeSelect.options).some(opt => opt.value === universe);
+  if (!existing) {
+    const option = document.createElement("option");
+    option.value = universe;
+    option.textContent = universe;
+    universeSelect.appendChild(option);
+  }
+}
+
+    function updateHistoryList() {
+      const list = document.getElementById("historyList");
+      list.innerHTML = "";
+      history.slice().reverse().forEach(entry => {
+        const li = document.createElement("li");
+        li.textContent = entry;
+        list.appendChild(li);
+      });
+    }
+    function addOrUpdateUniverse() {
+  const universeInput = document.getElementById("newUniverse").value.trim();
+  const charactersInput = document.getElementById("newCharacters").value.trim();
+
+  if (!universeInput || !charactersInput) {
+    alert("Please enter both a universe and at least one character.");
+    return;
+  }
+
+  const characters = charactersInput.split(",").map(c => c.trim()).filter(c => c.length > 0);
+
+  if (!characterData[universeInput]) {
+    // New universe
+    characterData[universeInput] = characters;
+    const universeSelect = document.getElementById("universeSelect");
+    const option = document.createElement("option");
+    option.value = universeInput;
+    option.textContent = universeInput;
+    universeSelect.appendChild(option);
+    alert(`Universe "${universeInput}" added with ${characters.length} character(s).`);
+saveCustomUniverse(universeInput, characters);
+
+  } else {
+    // Existing universe — append new characters only
+    const existing = characterData[universeInput];
+    let addedCount = 0;
+    characters.forEach(char => {
+      if (!existing.includes(char)) {
+        existing.push(char);
+        addedCount++;
+      }
+    });
+    alert(`${addedCount} new character(s) added to "${universeInput}".`);
+  }
+
+  // If the added/updated universe is currently selected, update its character list
+  if (document.getElementById("universeSelect").value === universeInput) {
+    updateCharacterList();
+  }
+
+  // Clear inputs
+  document.getElementById("newUniverse").value = "";
+  document.getElementById("newCharacters").value = "";
+}
+    function saveCustomUniverse(universe, characters) {
+  let saved = {};
+  try {
+    saved = JSON.parse(localStorage.getItem(LOCAL_UNIVERSES_KEY)) || {};
+  } catch {
+    saved = {};
+  }
+
+  if (!saved[universe]) {
+    saved[universe] = characters;
+  } else {
+    characters.forEach(char => {
+      if (!saved[universe].includes(char)) {
+        saved[universe].push(char);
+      }
+    });
+  }
+
+  localStorage.setItem(LOCAL_UNIVERSES_KEY, JSON.stringify(saved));
+}
+
+    function clearHistory() {
+      if (confirm("Clear your fate history?")) {
+        history = [];
+        localStorage.removeItem("scrollOfFatesHistory");
+        updateHistoryList();
+      }
+    }
+
+    // Init
+    loadCustomUniverses();
+    populateUniverses();
+    updateHistoryList();
+    function clearDestinyPool() {
+      if (confirm("Clear your entire Destiny Pool?")) {
+        destinyPool = [];
+        updatePoolList();
+      }
+    }
+    function rollRandomFate() {
+  const universes = Object.keys(characterData);
+  const universe = universes[Math.floor(Math.random() * universes.length)];
+  const characters = characterData[universe];
+  const character = characters[Math.floor(Math.random() * characters.length)];
+  const fate = `${universe} as ${character}`;
+
+  if (!destinyPool.includes(fate)) {
+    destinyPool.push(fate);
+    updatePoolList();
+  }
+
+  // Force the scroll to unfurl with this new fate
+  const scroll = document.getElementById("scroll");
+  const result = document.getElementById("result");
+  const quote = document.getElementById("quote");
+  const sound = document.getElementById("scrollSound");
+
+  const fateQuote = fateQuotes[Math.floor(Math.random() * fateQuotes.length)];
+
+  history.push(fate);
+  if (history.length > 10) history.shift();
+  localStorage.setItem("scrollOfFatesHistory", JSON.stringify(history));
+  updateHistoryList();
+
+  sound.currentTime = 0;
+  sound.play();
+
+  if (!scroll.classList.contains("open")) {
+    result.textContent = "You were reincarnated into: " + fate;
+    quote.textContent = fateQuote;
+    result.classList.remove("visible");
+    quote.classList.remove("visible");
+
+    scroll.classList.add("open");
+
+    setTimeout(() => {
+      result.classList.add("visible");
+      quote.classList.add("visible");
+    }, 1000);
+  } else {
+    scroll.classList.remove("open");
+    result.classList.remove("visible");
+    quote.classList.remove("visible");
+
+    setTimeout(() => {
+      result.textContent = "You were reincarnated into: " + fate;
+      quote.textContent = fateQuote;
+      scroll.classList.add("open");
+
+      setTimeout(() => {
+        result.classList.add("visible");
+        quote.classList.add("visible");
+      }, 1000);
+    }, 600);
+  }
+}
+
+  </script>
+</body>
+</html>
